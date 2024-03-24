@@ -4,8 +4,8 @@
 
 #include "mpu6500.h"
 
-#define IMU_QUEUE_SIZE 1000
 #define IMU_SAMPLING_RATE_HZ 4000
+#define IMU_QUEUE_SIZE IMU_SAMPLING_RATE_HZ
 #define Serial Serial1
 
 #define PIN_CS_1 5
@@ -191,6 +191,7 @@ void loop() {
         Serial.printf("[2] Ax: %d,\tAy: %d,\tAz: %d,\tGx: %d,\tGy: %d,\tGz: %d,\tT: %d\n", last_imu_2_data_raw.accel_x, last_imu_2_data_raw.accel_y, last_imu_2_data_raw.accel_z, last_imu_2_data_raw.gyro_x, last_imu_2_data_raw.gyro_y, last_imu_2_data_raw.gyro_z, last_imu_2_data_raw.temp);
         Serial.printf("[2] Ax: %f,\tAy: %f,\tAz: %f,\tGx: %f,\tGy: %f,\tGz: %f,\tT: %f\n", last_imu_2_data_scaled.accel_x, last_imu_2_data_scaled.accel_y, last_imu_2_data_scaled.accel_z, last_imu_2_data_scaled.gyro_x, last_imu_2_data_scaled.gyro_y, last_imu_2_data_scaled.gyro_z, last_imu_2_data_scaled.temp);
         Serial.printf("DT: (%d, %d) us, RE: %d, rate: %d hz (%llu total)\n", dt1, dt2, reader_not_empty, sample_fs, total_samples);
+        //Serial.printf("Log file size: %.3f MB\n", (float) current_log_file.size() / 1000000);
         last_debug_print = millis();
     }
 

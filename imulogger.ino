@@ -4,7 +4,7 @@
 
 #include "mpu6500.h"
 
-#define IMU_QUEUE_SIZE 3000
+#define IMU_QUEUE_SIZE 1000
 #define IMU_SAMPLING_RATE_HZ 4000
 #define Serial Serial1
 
@@ -101,7 +101,7 @@ static uint32_t sample_fs = 0;
 void setup1()
 {
     // We'll wait a bit to let main core initialize I/O
-    delay(100);
+    delay(1000);
     next_sample = micros() + period_us;
     sampling_t0 = millis();
 }
@@ -168,28 +168,29 @@ void loop() {
     static uint32_t t0 = 0;
     static uint32_t last_debug_print = 0;
 
-    while (!reader_queue->isEmpty())
+    if (!reader_queue->isEmpty())
     {
-        // There's new data in the RX buffer, so we'll empty it and write to SD card
-        last_imu_1_data_raw = reader_queue->dequeue();
-        last_imu_2_data_raw = reader_queue->dequeue();
-        imu1.scale_data(&last_imu_1_data_raw, &last_imu_1_data_scaled);
-        imu2.scale_data(&last_imu_2_data_raw, &last_imu_2_data_scaled);
-        current_log_file.write((uint8_t*) &last_imu_1_data_raw, sizeof(imu_data_raw_t));
-        current_log_file.write((uint8_t*) &last_imu_2_data_raw, sizeof(imu_data_raw_t));
+        while (!reader_queue->isEmpty())
+        {
+            // There's new data in the RX buffer, so we'll empty it and write to SD card
+            last_imu_1_data_raw = reader_queue->dequeue();
+            last_imu_2_data_raw = reader_queue->dequeue();
+            imu1.scale_data(&last_imu_1_data_raw, &last_imu_1_data_scaled);
+            imu2.scale_data(&last_imu_2_data_raw, &last_imu_2_data_scaled);
+            current_log_file.write((uint8_t*) &last_imu_1_data_raw, sizeof(imu_data_raw_t));
+            current_log_file.write((uint8_t*) &last_imu_2_data_raw, sizeof(imu_data_raw_t));
+        }
+        current_log_file.flush();
     }
 
     if ((millis() - last_debug_print) >= 1000)
     {
-        current_log_file.flush();
         Serial.print("\n");
         Serial.printf("[1] Ax: %d,\tAy: %d,\tAz: %d,\tGx: %d,\tGy: %d,\tGz: %d,\tT: %d\n", last_imu_1_data_raw.accel_x, last_imu_1_data_raw.accel_y, last_imu_1_data_raw.accel_z, last_imu_1_data_raw.gyro_x, last_imu_1_data_raw.gyro_y, last_imu_1_data_raw.gyro_z, last_imu_1_data_raw.temp);
         Serial.printf("[1] Ax: %f,\tAy: %f,\tAz: %f,\tGx: %f,\tGy: %f,\tGz: %f,\tT: %f\n", last_imu_1_data_scaled.accel_x, last_imu_1_data_scaled.accel_y, last_imu_1_data_scaled.accel_z, last_imu_1_data_scaled.gyro_x, last_imu_1_data_scaled.gyro_y, last_imu_1_data_scaled.gyro_z, last_imu_1_data_scaled.temp);
         Serial.printf("[2] Ax: %d,\tAy: %d,\tAz: %d,\tGx: %d,\tGy: %d,\tGz: %d,\tT: %d\n", last_imu_2_data_raw.accel_x, last_imu_2_data_raw.accel_y, last_imu_2_data_raw.accel_z, last_imu_2_data_raw.gyro_x, last_imu_2_data_raw.gyro_y, last_imu_2_data_raw.gyro_z, last_imu_2_data_raw.temp);
         Serial.printf("[2] Ax: %f,\tAy: %f,\tAz: %f,\tGx: %f,\tGy: %f,\tGz: %f,\tT: %f\n", last_imu_2_data_scaled.accel_x, last_imu_2_data_scaled.accel_y, last_imu_2_data_scaled.accel_z, last_imu_2_data_scaled.gyro_x, last_imu_2_data_scaled.gyro_y, last_imu_2_data_scaled.gyro_z, last_imu_2_data_scaled.temp);
         Serial.printf("DT: (%d, %d) us, RE: %d, rate: %d hz (%llu total)\n", dt1, dt2, reader_not_empty, sample_fs, total_samples);
-        Serial.print("Available files:\n");
-        cmd_ls("asd");
         last_debug_print = millis();
     }
 
@@ -202,6 +203,8 @@ static void shell_run()
     {
         String cmd = Serial.readStringUntil('\n');
 
+        // If listing files, don't forget to close active log file!!
+        //cmd_ls("asd");
         if (cmd.startsWith("ls"))
         {
             cmd_ls(cmd);

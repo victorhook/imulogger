@@ -43,6 +43,9 @@ imu_data_scaled_t last_imu_2_data_scaled;
 uint32_t dt1 = 0;
 uint32_t dt2 = 0;
 
+volatile static uint64_t bytes_should_have_written = 0;
+volatile static uint64_t bytes_have_written = 0;
+
 static const int gyro_raw_scaler  = GYRO_RAW_TO_DPS_2000;
 static const int accel_raw_scaler = ACCEL_RAW_TO_G_16G;
 
@@ -84,6 +87,7 @@ void setup() {
         current_log_file = SD.open("/log.bin", FILE_WRITE);
         char buf[128];
         sprintf_P(buf, "Imus: 2, Type: MPU6500, Rate: %d, Scale_accel: %d, Scale_gyro: %d\n", IMU_SAMPLING_RATE_HZ, accel_raw_scaler, gyro_raw_scaler);
+        current_log_file.truncate(0);
         current_log_file.write(buf, strlen(buf));
         current_log_file.flush();
     }
@@ -111,7 +115,7 @@ void loop1()
     static imu_data_raw_t raw_imu_1;
     static imu_data_raw_t raw_imu_2;
 
-    next_sample = micros() + period_us;
+    next_sample += period_us;
 
     uint32_t t0 = micros();
     imu1.read_raw(&raw_imu_1);
@@ -177,22 +181,25 @@ void loop() {
             last_imu_2_data_raw = reader_queue->dequeue();
             imu1.scale_data(&last_imu_1_data_raw, &last_imu_1_data_scaled);
             imu2.scale_data(&last_imu_2_data_raw, &last_imu_2_data_scaled);
-            current_log_file.write((uint8_t*) &last_imu_1_data_raw, sizeof(imu_data_raw_t));
-            current_log_file.write((uint8_t*) &last_imu_2_data_raw, sizeof(imu_data_raw_t));
+            bytes_should_have_written += 28;
+            bytes_have_written += current_log_file.write((uint8_t*) &last_imu_1_data_raw, sizeof(imu_data_raw_t));
+            bytes_have_written += current_log_file.write((uint8_t*) &last_imu_2_data_raw, sizeof(imu_data_raw_t));
+
         }
         current_log_file.flush();
     }
 
     if ((millis() - last_debug_print) >= 1000)
     {
+        last_debug_print = millis();
         Serial.print("\n");
         Serial.printf("[1] Ax: %d,\tAy: %d,\tAz: %d,\tGx: %d,\tGy: %d,\tGz: %d,\tT: %d\n", last_imu_1_data_raw.accel_x, last_imu_1_data_raw.accel_y, last_imu_1_data_raw.accel_z, last_imu_1_data_raw.gyro_x, last_imu_1_data_raw.gyro_y, last_imu_1_data_raw.gyro_z, last_imu_1_data_raw.temp);
         Serial.printf("[1] Ax: %f,\tAy: %f,\tAz: %f,\tGx: %f,\tGy: %f,\tGz: %f,\tT: %f\n", last_imu_1_data_scaled.accel_x, last_imu_1_data_scaled.accel_y, last_imu_1_data_scaled.accel_z, last_imu_1_data_scaled.gyro_x, last_imu_1_data_scaled.gyro_y, last_imu_1_data_scaled.gyro_z, last_imu_1_data_scaled.temp);
         Serial.printf("[2] Ax: %d,\tAy: %d,\tAz: %d,\tGx: %d,\tGy: %d,\tGz: %d,\tT: %d\n", last_imu_2_data_raw.accel_x, last_imu_2_data_raw.accel_y, last_imu_2_data_raw.accel_z, last_imu_2_data_raw.gyro_x, last_imu_2_data_raw.gyro_y, last_imu_2_data_raw.gyro_z, last_imu_2_data_raw.temp);
         Serial.printf("[2] Ax: %f,\tAy: %f,\tAz: %f,\tGx: %f,\tGy: %f,\tGz: %f,\tT: %f\n", last_imu_2_data_scaled.accel_x, last_imu_2_data_scaled.accel_y, last_imu_2_data_scaled.accel_z, last_imu_2_data_scaled.gyro_x, last_imu_2_data_scaled.gyro_y, last_imu_2_data_scaled.gyro_z, last_imu_2_data_scaled.temp);
         Serial.printf("DT: (%d, %d) us, RE: %d, rate: %d hz (%llu total)\n", dt1, dt2, reader_not_empty, sample_fs, total_samples);
-        //Serial.printf("Log file size: %.3f MB\n", (float) current_log_file.size() / 1000000);
-        last_debug_print = millis();
+        Serial.printf("Written: %.2f / %.2f MB\n", (double) bytes_have_written / 1000000.0, (double) bytes_should_have_written / 1000000.0);
+        //Serial.printf("Log file size: %.3f MB\n", (float) current_log_file.size() /f 1000000);
     }
 
 }
